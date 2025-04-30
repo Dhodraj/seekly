@@ -35,7 +35,7 @@ This will install Seekly as a system-wide command.
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/seekly.git
+   git clone https://github.com/Dhodraj/seekly
    cd seekly
    ```
 
