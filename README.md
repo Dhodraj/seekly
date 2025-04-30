@@ -18,36 +18,52 @@ Seekly CLI enables semantic search for files using natural language queries. It 
 
 ## Installation
 
-### Option 1: Install with pip (Recommended)
+### Option 1: Simple One-Step Install
+
+Download and run the installer script which automatically handles everything for you:
 
 ```bash
-# Install directly from the project directory
-pip install -e /path/to/seekly
+# Using curl
+curl -sSL https://raw.githubusercontent.com/Dhodraj/seekly/master/pipx_install.py | python3
 
-# Or navigate to the directory and install
-cd /path/to/seekly
-pip install -e .
+# Or using wget
+wget -qO- https://raw.githubusercontent.com/Dhodraj/seekly/master/pipx_install.py | python3
+
+# Or clone and run locally
+git clone https://github.com/Dhodraj/seekly.git
+cd seekly
+python3 pipx_install.py
 ```
 
-This will install Seekly as a system-wide command.
+This installer works on any system, including those with externally managed Python environments (like modern Debian/Ubuntu).
 
-### Option 2: Clone and Run Directly
+### Option 2: Standard Installation
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/Dhodraj/seekly
-   cd seekly
-   ```
+```bash
+# Install directly from PyPI
+pip install seekly
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Or install directly from GitHub
+pip install git+https://github.com/Dhodraj/seekly.git
+```
 
-3. Make the script executable:
-   ```bash
-   chmod +x seekly.py
-   ```
+### Option 3: For Externally Managed Environments
+
+If you're on a system with an externally managed Python environment:
+
+```bash
+# Install with pipx
+pipx install seekly
+```
+
+### Option 4: Development Installation
+
+```bash
+# Clone and install in development mode
+git clone https://github.com/Dhodraj/seekly.git
+cd seekly
+pip install -e .
+```
 
 ## Usage
 
