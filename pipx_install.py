@@ -17,6 +17,7 @@ import sys
 import subprocess
 import platform
 from pathlib import Path
+import shutil
 
 
 def run_command(cmd, capture=True):
@@ -119,6 +120,131 @@ def install_pipx():
     return False
 
 
+def update_user_path(bin_dir):
+    """
+    Update user's PATH to include pipx binaries directory.
+    
+    Args:
+        bin_dir: Directory to add to PATH
+        
+    Returns:
+        Boolean indicating success
+    """
+    # Different approaches based on platform
+    if platform.system() == "Windows":
+        # For Windows, use the registry or setx
+        os.system(f'setx PATH "%PATH%;{bin_dir}"')
+        os.environ["PATH"] += f";{bin_dir}"
+        return True
+    else:
+        # For Unix-like systems, modify shell startup files
+        # Detect which shell is being used
+        shell = os.environ.get("SHELL", "")
+        
+        # Default to ~/.profile if shell can't be determined
+        shell_rc_file = os.path.expanduser("~/.profile")
+        
+        # Determine appropriate shell config file
+        if "bash" in shell:
+            shell_rc_file = os.path.expanduser("~/.bashrc")
+        elif "zsh" in shell:
+            shell_rc_file = os.path.expanduser("~/.zshrc")
+        elif "fish" in shell:
+            shell_rc_file = os.path.expanduser("~/.config/fish/config.fish")
+            
+        # Skip if already in PATH
+        if bin_dir in os.environ.get("PATH", ""):
+            return True
+            
+        # Backup the rc file
+        backup_file = f"{shell_rc_file}.seekly_bak"
+        try:
+            if os.path.exists(shell_rc_file) and not os.path.exists(backup_file):
+                shutil.copy(shell_rc_file, backup_file)
+        except Exception:
+            pass
+            
+        # Check if bin_dir already in file to avoid duplicates
+        try:
+            if os.path.exists(shell_rc_file):
+                with open(shell_rc_file, 'r') as f:
+                    content = f.read()
+                    if bin_dir in content:
+                        return True
+        except Exception:
+            pass
+        
+        # Append to shell config
+        try:
+            with open(shell_rc_file, 'a+') as f:
+                if "fish" in shell:
+                    f.write(f"\n# Added by Seekly installer\nset -x PATH {bin_dir} $PATH\n")
+                else:
+                    f.write(f"\n# Added by Seekly installer\nexport PATH=\"{bin_dir}:$PATH\"\n")
+            return True
+        except Exception as e:
+            print(f"Error updating shell config: {str(e)}")
+            return False
+
+
+def get_pipx_bin_dir():
+    """
+    Get the directory where pipx installs binaries.
+    
+    Returns:
+        Path to the pipx bin directory
+    """
+    # Try to get it from pipx
+    success, output = run_command("pipx environment --value PIPX_BIN_DIR")
+    if success and output.strip():
+        return output.strip()
+        
+    # Default locations by OS
+    if platform.system() == "Windows":
+        return os.path.expanduser("~\\.local\\bin")
+    else:
+        return os.path.expanduser("~/.local/bin")
+
+
+def ensure_seekly_runnable():
+    """
+    Ensure the seekly command can be run by updating PATH if needed.
+    
+    Returns:
+        Tuple of (success, bin_path)
+    """
+    # First check if seekly is already runnable
+    if check_command_exists("seekly"):
+        return True, ""
+        
+    # If not, determine the pipx bin directory
+    bin_dir = get_pipx_bin_dir()
+    
+    # Verify seekly exists in this directory
+    seekly_path = os.path.join(bin_dir, "seekly")
+    if platform.system() == "Windows":
+        seekly_path += ".exe"
+        
+    if not os.path.exists(seekly_path):
+        seekly_path = ""
+        # Try to find seekly in common locations
+        for path_dir in os.environ.get("PATH", "").split(os.pathsep):
+            test_path = os.path.join(path_dir, "seekly")
+            if platform.system() == "Windows":
+                test_path += ".exe"
+            if os.path.exists(test_path):
+                seekly_path = test_path
+                bin_dir = path_dir
+                break
+                
+    if not seekly_path:
+        return False, bin_dir
+        
+    # Update PATH if needed and return the bin directory
+    updated = update_user_path(bin_dir)
+    return updated, bin_dir
+
+
 def install_seekly():
     """
     Main function to install Seekly via pipx.
@@ -152,10 +278,44 @@ def install_seekly():
     
     if success:
         print("\n✓ Seekly CLI installed successfully!")
-        print("\nYou can now use Seekly with commands like:")
-        print("  seekly search \"find function that validates email\"")
-        print("  seekly info")
-        print("  seekly --help")
+        
+        # Make sure seekly is runnable in the current shell
+        path_updated, bin_dir = ensure_seekly_runnable()
+        
+        if path_updated:
+            print("\n✓ Seekly command is now available!")
+            print("\nYou can start using Seekly immediately with commands like:")
+            
+            # For Windows, suggest reopening terminal
+            if platform.system() == "Windows":
+                print("\nNOTE: You may need to open a new terminal window first.")
+            # For Unix-like systems, suggest sourcing the shell config
+            else:
+                shell = os.environ.get("SHELL", "")
+                if "bash" in shell:
+                    print("\nTo use Seekly in this terminal session, run:")
+                    print("  source ~/.bashrc")
+                elif "zsh" in shell:
+                    print("\nTo use Seekly in this terminal session, run:")
+                    print("  source ~/.zshrc")
+                elif "fish" in shell:
+                    print("\nTo use Seekly in this terminal session, run:")
+                    print("  source ~/.config/fish/config.fish")
+                else:
+                    print("\nTo use Seekly in this terminal session, run:")
+                    print("  source ~/.profile")
+            
+            print("\nThen you can use commands like:")
+            print("  seekly search \"find function that validates email\"")
+            print("  seekly info")
+            print("  seekly --help")
+        else:
+            print(f"\nNOTE: Seekly was installed successfully, but you may need to add")
+            print(f"      {bin_dir} to your PATH to use it.")
+            print("\nUntil then, you can use Seekly with:")
+            seekly_path = os.path.join(bin_dir, "seekly")
+            print(f"  {seekly_path} search \"your query here\"")
+            
         return True
     else:
         print("\n✗ Installation failed.")
