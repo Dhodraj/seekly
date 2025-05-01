@@ -58,7 +58,8 @@ jobs:
     - name: Extract current version
       id: get_version
       run: |
-        VERSION=$(python -c "from setuptools.config.setupcfg import read_configuration; print(read_configuration('setup.py')['metadata']['version'])")
+        # Using a more reliable and compatible approach to extract version
+        VERSION=$(python -c "import re; print(re.search(r'version=['\"]([^'\"]+)['\"]', open('setup.py').read()).group(1))")
         echo "Current version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
       shell: bash
