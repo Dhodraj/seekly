@@ -59,7 +59,7 @@ jobs:
       id: get_version
       run: |
         # Using a more reliable and compatible approach to extract version
-        VERSION=$(python -c "import re; print(re.search(r'version=['\"]([^'\"]+)['\"]', open('setup.py').read()).group(1))")
+        VERSION=$(python -c "import re; print(re.search(r'version=([\'\\\"]([^\'\\\"]*)[\'\\\"])', open('setup.py').read()).group(2))")
         echo "Current version: $VERSION"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
       shell: bash
