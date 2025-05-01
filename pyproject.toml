@@ -38,4 +38,4 @@ packages = ["seekly"]
 py-modules = ["seekly"]
 
 [tool.setuptools.package-data]
-"" = ["assets/*.jpg", "assets/*.png"]
+"*" = ["assets/*.jpg", "assets/*.png"]
