@@ -1,0 +1,103 @@
+name: Publish to PyPI
+
+# Adaptable trigger system that can work with different release patterns
+on:
+  # Publish when release is created
+  release:
+    types: [created]
+  
+  # Allow manual triggering through GitHub UI
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version update'
+        required: true
+        default: 'patch'
+        type: 'choice'
+        options:
+          - patch
+          - minor
+          - major
+
+# Set environment variables at the workflow level for reuse
+env:
+  PYTHON_VERSION: '3.8'  # Minimum supported Python version
+
+jobs:
+  deploy:
+    runs-on: ${{ matrix.os }}
+    
+    # Matrix-based approach for cross-platform compatibility
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # Can be expanded to test on multiple platforms:
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        # Fetch all history for proper versioning
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine setuptools wheel
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      shell: bash
+    
+    # Version detection to avoid hardcoding
+    - name: Extract current version
+      id: get_version
+      run: |
+        VERSION=$(python -c "from setuptools.config.setupcfg import read_configuration; print(read_configuration('setup.py')['metadata']['version'])")
+        echo "Current version: $VERSION"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+      shell: bash
+    
+    # Adaptive test runner - will run whatever tests exist
+    - name: Run tests
+      run: |
+        if [ -d "seekly/tests" ]; then
+          python -m unittest discover seekly/tests
+        elif [ -d "tests" ]; then
+          python -m unittest discover tests
+        else
+          echo "No test directory found, skipping tests"
+        fi
+      shell: bash
+    
+    # Build distribution in a way that works on any platform
+    - name: Build package
+      run: python -m build
+    
+    # Validate package structure and metadata
+    - name: Check package
+      run: twine check dist/*
+    
+    # Publish to PyPI with secure token-based authentication
+    - name: Publish to PyPI
+      if: success()
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: twine upload dist/*
+    
+    # Create GitHub release notes automatically
+    - name: Update release notes
+      if: github.event_name == 'workflow_dispatch' && success()
+      uses: softprops/action-gh-release@v1
+      with:
+        name: v${{ steps.get_version.outputs.version }}
+        tag_name: v${{ steps.get_version.outputs.version }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
