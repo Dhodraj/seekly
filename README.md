@@ -1,5 +1,9 @@
 # Seekly CLI
 
+<p align="center">
+  <img src="assets/seekly.jpg" alt="Seekly Logo" width="200"/>
+</p>
+
 A command-line tool for natural language search across your codebase using semantic code understanding.
 
 ## Overview

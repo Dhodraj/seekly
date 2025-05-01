@@ -36,3 +36,6 @@ seekly = "seekly:cli"
 [tool.setuptools]
 packages = ["seekly"]
 py-modules = ["seekly"]
+
+[tool.setuptools.package-data]
+"" = ["assets/*.jpg", "assets/*.png"]

@@ -47,4 +47,8 @@ setup(
         ],
     },
     py_modules=["seekly"],  # This includes the root seekly.py file in the package
+    package_data={
+        "": ["assets/*.jpg", "assets/*.png"],  # Include all image files in the assets directory
+    },
+    include_package_data=True,  # This tells setuptools to include package_data
 )
