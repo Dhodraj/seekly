@@ -26,7 +26,7 @@ else:
 
 setup(
     name="seekly",
-    version="0.1.0",
+    version="0.1.1",
     author="Dhodraj Sundaram",
     author_email="dhodrajsdr192@gmail.com",
     description="Natural language search for files using all-MiniLM-L6-v2 model",
