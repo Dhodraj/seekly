@@ -10,6 +10,7 @@ import time
 import click
 from pathlib import Path
 from seekly.search import SeeklySearch
+from seekly.spinner import Spinner
 
 
 # Create a shared context for commands to access the same searcher instance
@@ -17,6 +18,7 @@ class SeeklyContext:
     def __init__(self):
         self.searcher = SeeklySearch(verbose=False)
         self.verbose = False
+        self.spinner = Spinner()
 
 pass_seekly_context = click.make_pass_decorator(SeeklyContext, ensure=True)
 
@@ -25,7 +27,19 @@ pass_seekly_context = click.make_pass_decorator(SeeklyContext, ensure=True)
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed debug information")
 @click.pass_context
 def cli(ctx, verbose):
-    """Natural language search for code across files and directories."""
+    """Natural language search for code across files and directories.
+    
+    Common options available in subcommands:
+    
+      --dir, -d          Directory to search in (default: current directory)
+      
+      --top-k, -k        Number of results to display (default: 10)
+      
+      --similarity, -s   Minimum similarity threshold for results (0-1)
+    
+    Example usage:
+      seekly search "function that sorts an array" --dir ~/projects --top-k 5
+    """
     # Initialize the context
     ctx.obj = SeeklyContext()
     ctx.obj.verbose = verbose
@@ -37,7 +51,7 @@ def cli(ctx, verbose):
               help="Directory to search in")
 @click.option("--top-k", "-k", default=10, show_default=True, type=int,
               help="Maximum number of results to show")
-@click.option("--similarity", "-s", default=0.4, show_default=True, type=float,
+@click.option("--similarity", "-s", default=0.5, show_default=True, type=float,
               help="Minimum similarity score (0-1)")
 @click.option("--snippets/--no-snippets", default=True, show_default=True,
               help="Show code snippets in results")
@@ -73,56 +87,77 @@ def search(ctx, query: str = None, dir: str = ".", top_k: int = 10,
     # Set verbose mode based on context
     ctx.searcher.verbose = ctx.verbose
     
-    # Automatically load model if needed - no separate command required
+    # Automatically load model if needed - use spinner for visual feedback
     if not ctx.searcher.is_model_loaded():
         try:
-            if ctx.verbose:
-                click.echo("Loading semantic search model...")
-            ctx.searcher.load_model(verbose_override=ctx.verbose)
+            # Start spinner for model loading
+            ctx.spinner.start("Loading semantic search model")
+            
+            # Load the model
+            success = ctx.searcher.load_model(verbose_override=False)
+            
+            # Stop spinner with appropriate message
+            if success:
+                ctx.spinner.stop("Model loaded successfully!")
+            else:
+                ctx.spinner.stop("Failed to load model")
+                click.echo("Error: Could not load semantic search model.")
+                sys.exit(1)
         except Exception as e:
+            ctx.spinner.stop()
             click.echo(f"Error loading model: {str(e)}")
             click.echo("Please check your internet connection and try again.")
             sys.exit(1)
     
-    # Perform the search
+    # Use spinner during search operation
     start_time = time.time()
     click.echo(f"Searching for: '{query}' in {dir_path}")
     
-    # Search with minimum similarity score of 0.4 by default
-    results = ctx.searcher.search(query, dir_path, max(50, top_k * 2), similarity, force_reindex=False)
+    # Start spinner for search operation
+    ctx.spinner.start("Analyzing files and computing semantic matches")
     
-    # Display results
-    search_time = time.time() - start_time
-    
-    if not results:
-        click.echo(f"\nNo results found with similarity score ≥ {similarity:.2f} in {search_time:.2f} seconds.")
-        click.echo(f"Try lowering the similarity score with --similarity option or try a different query.")
-        return
-    
-    # Show all results or just top-k based on user preference
-    display_results = results if all else results[:top_k]
-    
-    click.echo(f"\nFound {len(display_results)} results in {search_time:.2f} seconds:\n")
-    
-    # Import needed function here to avoid circular imports
-    from seekly.file_processor import extract_relevant_code_snippet
-    
-    for i, (file_path, score) in enumerate(display_results, 1):
-        # Format the result line with clear relevance score
-        relevance_indicator = "★ " if score > 0.7 else "  "
-        result_line = f"{i}. {relevance_indicator}{file_path}: {score:.4f}"
-        click.echo(result_line)
+    try:
+        # Search with minimum similarity score of 0.4 by default
+        results = ctx.searcher.search(query, dir_path, max(50, top_k * 2), similarity, force_reindex=False)
+        search_time = time.time() - start_time
         
-        # Show code snippets if enabled
-        if snippets:
-            abs_file_path = os.path.join(dir_path, file_path) if not os.path.isabs(file_path) else file_path
-            code_lines = extract_relevant_code_snippet(abs_file_path, query)
+        # Stop spinner with appropriate message
+        ctx.spinner.stop()
+        
+        if not results:
+            click.echo(f"\nNo results found with similarity score ≥ {similarity:.2f} in {search_time:.2f} seconds.")
+            click.echo(f"Try lowering the similarity score with --similarity option or try a different query.")
+            return
+        
+        # Show all results or just top-k based on user preference
+        display_results = results if all else results[:top_k]
+        
+        click.echo(f"\nFound {len(display_results)} results in {search_time:.2f} seconds:\n")
+        
+        # Import needed function here to avoid circular imports
+        from seekly.file_processor import extract_relevant_code_snippet
+        
+        for i, (file_path, score) in enumerate(display_results, 1):
+            # Format the result line with clear relevance score
+            relevance_indicator = "★ " if score > 0.7 else "  "
+            result_line = f"{i}. {relevance_indicator}{file_path}: {score:.4f}"
+            click.echo(result_line)
             
-            if code_lines:
-                click.echo("\n   Relevant code:")
-                for j, line in enumerate(code_lines, 1):
-                    click.echo(f"   {j}: {line}")
-                click.echo("")  # Add empty line after snippet
+            # Show code snippets if enabled
+            if snippets:
+                abs_file_path = os.path.join(dir_path, file_path) if not os.path.isabs(file_path) else file_path
+                code_lines = extract_relevant_code_snippet(abs_file_path, query)
+                
+                if code_lines:
+                    click.echo("\n   Relevant code:")
+                    for j, line in enumerate(code_lines, 1):
+                        click.echo(f"   {j}: {line}")
+                    click.echo("")  # Add empty line after snippet
+    except Exception as e:
+        # Make sure to stop spinner if an error occurs
+        ctx.spinner.stop()
+        click.echo(f"Error during search: {str(e)}")
+        sys.exit(1)
 
 
 @cli.command(help="Clear cached data to free up disk space")
@@ -281,7 +316,9 @@ def info(ctx):
     
     # Usage hints
     click.echo("\nQuick Tips:")
-    click.echo("  • Search:  seekly search \"function that calculates average\"")
+    click.echo("  • Search:  seekly search \"function that calculates average\" --dir ~/projects --top-k 5")
+    click.echo("  • High relevance search:  seekly search \"error handling\" --similarity 0.6")
+    click.echo("  • Open file: seekly open \"main config file\" --dir ~/projects")
     click.echo("  • Clear:   seekly clear --all")
     click.echo("  • Help:    seekly --help")
 
@@ -308,45 +345,74 @@ def open(ctx, query: str, dir: str, editor: str = None):
         click.echo(f"Error: Directory '{dir}' does not exist", err=True)
         sys.exit(1)
     
-    # Auto-load the model if needed
+    # Auto-load the model if needed - use spinner for visual feedback
     if not ctx.searcher.is_model_loaded():
-        click.echo("Preparing to search...")
-        if not ctx.searcher.load_model(verbose_override=False):
-            click.echo("Error: Failed to load search model.")
+        try:
+            # Start spinner for model loading
+            ctx.spinner.start("Loading semantic search model")
+            
+            # Load the model
+            success = ctx.searcher.load_model(verbose_override=False)
+            
+            # Stop spinner
+            if success:
+                ctx.spinner.stop("Model loaded successfully!")
+            else:
+                ctx.spinner.stop("Failed to load model")
+                click.echo("Error: Failed to load semantic search model.")
+                sys.exit(1)
+        except Exception as e:
+            ctx.spinner.stop()
+            click.echo(f"Error loading model: {str(e)}")
             sys.exit(1)
     
-    # Search for the best matching file
+    # Search for the best matching file with spinner
     click.echo(f"Finding file that matches: '{query}'")
-    results = ctx.searcher.search(query, dir_path, 1, similarity=0.3)
     
-    if not results:
-        click.echo("No matching files found.")
-        return
-    
-    # Get the top result
-    file_path, score = results[0]
-    abs_file_path = os.path.join(dir_path, file_path) if not os.path.isabs(file_path) else file_path
-    
-    # Show which file we're opening
-    click.echo(f"Opening: {file_path} (relevance: {score:.4f})")
+    # Start spinner for search operation
+    ctx.spinner.start("Searching for relevant files")
     
     try:
-        # Determine how to open the file
-        if editor:
-            os.system(f'{editor} "{abs_file_path}"')
-        else:
-            # Use platform-specific method to open with default program
-            if sys.platform.startswith('darwin'):  # macOS
-                os.system(f'open "{abs_file_path}"')
-            elif sys.platform.startswith('win'):   # Windows
-                os.system(f'start "" "{abs_file_path}"')
-            else:  # Linux and others
-                os.system(f'xdg-open "{abs_file_path}"')
+        # Perform the search
+        results = ctx.searcher.search(query, dir_path, 1, similarity=0.3)
         
-        click.echo(f"File opened successfully.")
+        # Stop spinner
+        ctx.spinner.stop()
+        
+        if not results:
+            click.echo("No matching files found.")
+            return
+        
+        # Get the top result
+        file_path, score = results[0]
+        abs_file_path = os.path.join(dir_path, file_path) if not os.path.isabs(file_path) else file_path
+        
+        # Show which file we're opening
+        click.echo(f"Opening: {file_path} (relevance: {score:.4f})")
+        
+        try:
+            # Determine how to open the file
+            if editor:
+                os.system(f'{editor} "{abs_file_path}"')
+            else:
+                # Use platform-specific method to open with default program
+                if sys.platform.startswith('darwin'):  # macOS
+                    os.system(f'open "{abs_file_path}"')
+                elif sys.platform.startswith('win'):   # Windows
+                    os.system(f'start "" "{abs_file_path}"')
+                else:  # Linux and others
+                    os.system(f'xdg-open "{abs_file_path}"')
+            
+            click.echo(f"File opened successfully.")
+        except Exception as e:
+            click.echo(f"Error opening file: {str(e)}")
+            click.echo(f"File path: {abs_file_path}")
+            
     except Exception as e:
-        click.echo(f"Error opening file: {str(e)}")
-        click.echo(f"File path: {abs_file_path}")
+        # Make sure to stop spinner if an error occurs
+        ctx.spinner.stop()
+        click.echo(f"Error during search: {str(e)}")
+        sys.exit(1)
 
 
 @cli.command(name="list", help="List supported file extensions")
@@ -411,6 +477,53 @@ def list_extensions(ctx, group: bool):
         for i in range(0, len(sorted_extensions), 8):
             row = sorted_extensions[i:i+8]
             click.echo("  " + "  ".join(f"{ext:<6}" for ext in row))
+
+
+@cli.command(help="Show all available command options")
+def options():
+    """
+    Display all available options and parameters for Seekly commands.
+    
+    Examples:
+      seekly options
+    """
+    click.echo("Seekly Command Options")
+    click.echo("====================\n")
+    
+    # Main search options
+    click.echo("Search Options:")
+    click.echo("  --dir, -d         Directory to search in (default: current directory)")
+    click.echo("  --top-k, -k       Number of results to display (default: 10)")
+    click.echo("  --similarity, -s  Minimum similarity threshold for results (0-1)")
+    click.echo("  --snippets        Show code snippets in results (default: enabled)")
+    click.echo("  --no-snippets     Hide code snippets in results")
+    click.echo("  --all             Show all matching results (default)")
+    click.echo("  --limit           Limit results to top-k matches")
+    
+    # Open command options
+    click.echo("\nOpen File Options:")
+    click.echo("  --dir, -d         Directory to search in (default: current directory)")
+    click.echo("  --editor, -e      Editor to use (default: system default)")
+    
+    # Clear command options
+    click.echo("\nCache Clear Options:")
+    click.echo("  --all, -a         Clear both model and embeddings cache")
+    click.echo("  --embeddings, -e  Clear only embedding cache")
+    click.echo("  --model, -m       Clear only model cache")
+    click.echo("  --dir, -d         Clear cache for specific directory only")
+    click.echo("  --yes, -y         Skip confirmation prompt")
+    
+    # Other options
+    click.echo("\nGeneral Options:")
+    click.echo("  --verbose, -v     Show detailed debug information")
+    click.echo("  --help            Show help message for a command")
+    
+    # Advanced usage examples
+    click.echo("\nAdvanced Usage Examples:")
+    click.echo("  seekly search \"error handling\" --dir ~/projects --top-k 5 --similarity 0.6")
+    click.echo("  seekly search \"database connection\" --no-snippets --limit")
+    click.echo("  seekly open \"config file\" --editor code")
+    click.echo("  seekly clear --embeddings --dir ~/specific-project")
 
 
 def format_size(size_bytes):

@@ -80,8 +80,10 @@ def get_package_source():
     # If we're running from the Seekly repository, use local path
     if os.path.exists("setup.py") and os.path.isdir("seekly"):
         return "."
-    # Otherwise use GitHub source
-    return "git+https://github.com/Dhodraj/seekly.git"
+    
+    # By default, install from PyPI for stability with released versions
+    # This ensures users get properly versioned, stable releases
+    return "seekly"
 
 
 def install_pipx():

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seekly"
-version = "0.1.1"
+version = "1.1.2"
 description = "Natural language search for files using semantic code understanding"
 readme = "README.md"
 authors = [

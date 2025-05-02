@@ -22,52 +22,59 @@ Seekly CLI enables semantic search for files using natural language queries. It 
 
 ## Installation
 
-### Option 1: Simple One-Step Install
+**Recommended Installation Method:**
+```bash
+# One-line installation with curl (works on all systems including externally managed environments)
+curl -sSL https://raw.githubusercontent.com/Dhodraj/seekly/master/pipx_install.py | python3
+```
 
-Download and run the installer script which automatically handles everything for you:
+This method works reliably across all systems, including externally managed Python environments like those in modern Debian/Ubuntu systems.
+
+### Alternative Installation Methods
+
+<details>
+<summary>Click to expand other installation options</summary>
 
 ```bash
-# Using curl
-curl -sSL https://raw.githubusercontent.com/Dhodraj/seekly/master/pipx_install.py | python3
-
-# Or using wget
+# Using wget
 wget -qO- https://raw.githubusercontent.com/Dhodraj/seekly/master/pipx_install.py | python3
 
-# Or clone and run locally
-git clone https://github.com/Dhodraj/seekly.git
-cd seekly
-python3 pipx_install.py
-```
+# Or install directly with pipx (good for externally managed environments)
+pipx install seekly
 
-This installer works on any system, including those with externally managed Python environments (like modern Debian/Ubuntu).
-
-### Option 2: Standard Installation
-
-```bash
-# Install directly from PyPI
+# Or standard pip installation (not recommended for externally managed environments)
 pip install seekly
 
-# Or install directly from GitHub
-pip install git+https://github.com/Dhodraj/seekly.git
-```
-
-### Option 3: For Externally Managed Environments
-
-If you're on a system with an externally managed Python environment:
-
-```bash
-# Install with pipx
-pipx install seekly
-```
-
-### Option 4: Development Installation
-
-```bash
-# Clone and install in development mode
+# For development
 git clone https://github.com/Dhodraj/seekly.git
 cd seekly
 pip install -e .
 ```
+</details>
+
+## Uninstallation
+
+**Recommended Uninstallation Method:**
+```bash
+# Uninstall with pipx (works reliably across all systems)
+pipx uninstall seekly
+
+# Remove all Seekly data from your system
+rm -rf ~/.seekly  # Linux/macOS
+# OR
+rd /s /q %USERPROFILE%\.seekly  # Windows
+```
+
+This uninstallation method works consistently across all system configurations and is especially recommended for externally managed Python environments.
+
+<details>
+<summary>Click to expand other uninstallation options</summary>
+
+```bash
+# Only if installed with pip on systems that allow direct pip management
+pip uninstall -y seekly
+```
+</details>
 
 ## Usage
 
